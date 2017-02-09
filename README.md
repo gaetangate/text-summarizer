@@ -1,2 +1,2 @@
 # text-summarizer
-Framework for Extractive Text Summarization  
+Python Framework for Extractive Text Summarization  
