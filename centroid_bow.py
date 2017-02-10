@@ -51,7 +51,7 @@ class CentroidBOWSummarizer(base.BaseSummarizer):
                 break
             include_flag = True
             for ps in sentences_summary:
-                sim = similarity(s[3], ps[3])
+                sim = base.similarity(s[3], ps[3])
                 # print(s[0], ps[0], sim)
                 if sim > self.sim_threshold:
                     include_flag = False
