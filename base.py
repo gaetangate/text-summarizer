@@ -2,7 +2,9 @@
     Author: Gaetano Rossiello
     Email: gaetano.rossiello@uniba.it
 """
+import re
 import string
+import unidecode
 import numpy as np
 from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.corpus import stopwords
@@ -22,17 +24,28 @@ class BaseSummarizer:
 
     def __init__(self,
                  language='english',
+                 preprocess_type='nltk',
                  stopwords_remove=True,
+                 length_limit=10,
                  debug=False):
         self.language = language
+        self.preprocess_type = preprocess_type
         self.stopwords_remove = stopwords_remove
+        self.length_limit = length_limit
         self.debug = debug
         return
 
     def sent_tokenize(self, text):
-        return sent_tokenize(text, self.language)
+        sents = sent_tokenize(text, self.language)
+        sents_filtered = []
+        for s in sents:
+            if s[-1] != ':' and len(s) > self.length_limit:
+                sents_filtered.append(s)
+            # else:
+            #   print("REMOVED!!!!" + s)
+        return sents_filtered
 
-    def preprocess_text(self, text):
+    def preprocess_text_nltk(self, text):
         sentences = self.sent_tokenize(text)
         sentences_cleaned = []
         for sent in sentences:
@@ -45,6 +58,25 @@ class BaseSummarizer:
                 words = [w for w in words if w not in stops]
             sentences_cleaned.append(" ".join(words))
         return sentences_cleaned
+
+    def preprocess_text_regexp(self, text):
+        sentences = self.sent_tokenize(text)
+        sentences_cleaned = []
+        for sent in sentences:
+            sent_ascii = unidecode.unidecode(sent)
+            cleaned_text = re.sub("[^a-zA-Z0-9]", " ", sent_ascii)
+            words = cleaned_text.lower().split()
+            if self.stopwords_remove:
+                stops = set(stopwords.words(self.language))
+                words = [w for w in words if w not in stops]
+            sentences_cleaned.append(" ".join(words))
+        return sentences_cleaned
+
+    def preprocess_text(self, text):
+        if self.preprocess_type == 'nltk':
+            return self.preprocess_text_nltk(text)
+        else:
+            return self.preprocess_text_regexp(text)
 
     def summarize(self, text, limit_type='word', limit=100):
         raise NotImplementedError("Abstract method")

@@ -9,9 +9,11 @@ class LeadSummarizer(base.BaseSummarizer):
 
     def __init__(self,
                  language='english',
+                 preprocess_type='nltk',
+                 length_limit=10,
                  stopwords_remove=True,
                  debug=False):
-        super().__init__(language, stopwords_remove, debug)
+        super().__init__(language, preprocess_type, stopwords_remove, length_limit, debug)
         return
 
     def summarize(self, text, limit_type='word', limit=100):

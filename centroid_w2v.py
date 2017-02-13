@@ -1,5 +1,5 @@
 """
-Implementation based on:
+Implementation based on paper:
 
 Centroid-based Text Summarization through Compositionality of Word Embeddings
 
@@ -12,18 +12,57 @@ from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from gensim.models.word2vec import Word2Vec
 
 
+def average_score(scores):
+    score = 0
+    count = 0
+    for s in scores:
+        if s > 0:
+            score += s
+            count += 1
+    if count > 0:
+        score /= count
+        return score
+    else:
+        return 0
+
+
+def stanford_cerainty_factor(scores):
+    score = 0
+    minim = 100000
+    for s in scores:
+        score += s
+        if s < minim & s > 0:
+            minim = s
+    score /= (1 - minim)
+    return score
+
+
+def get_max_length(sentences):
+    max_length = 0
+    for s in sentences:
+        l = len(s.split())
+        if l > max_length:
+            max_length = l
+    return max_length
+
+
 class CentroidW2VSummarizer(base.BaseSummarizer):
     def __init__(self,
                  word2vec_model_path,
                  language='english',
+                 preprocess_type='nltk',
                  stopwords_remove=True,
+                 length_limit=10,
                  debug=False,
                  topic_threshold=0.3,
                  sim_threshold=0.95,
                  reordering=True,
                  subtract_centroid=False,
-                 keep_first=False):
-        super().__init__(language, stopwords_remove, debug)
+                 keep_first=False,
+                 bow_param=0,
+                 length_param=0,
+                 position_param=0):
+        super().__init__(language, preprocess_type, stopwords_remove, length_limit, debug)
 
         self.word2vec = Word2Vec.load_word2vec_format(word2vec_model_path, binary=True)
         self.index2word_set = set(self.word2vec.wv.index2word)
@@ -34,9 +73,13 @@ class CentroidW2VSummarizer(base.BaseSummarizer):
         self.reordering = reordering
 
         self.keep_first = keep_first
+        self.bow_param = bow_param
+        self.length_param = length_param
+        self.position_param = position_param
+
         self.subtract_centroid = subtract_centroid
 
-        # Create centroid of all vector space
+        # Create the centroid vector of the whole vector space
         count = 0
         self.centroid_space = np.zeros(self.word2vec.vector_size, dtype="float32")
         for w in self.index2word_set:
@@ -45,6 +88,21 @@ class CentroidW2VSummarizer(base.BaseSummarizer):
         if count != 0:
             self.centroid_space = np.divide(self.centroid_space, count)
         return
+
+    def get_bow(self, sentences):
+        vectorizer = CountVectorizer()
+        sent_word_matrix = vectorizer.fit_transform(sentences)
+
+        transformer = TfidfTransformer(norm=None, sublinear_tf=False, smooth_idf=False)
+        tfidf = transformer.fit_transform(sent_word_matrix)
+        tfidf = tfidf.toarray()
+
+        centroid_vector = tfidf.sum(0)
+        centroid_vector = np.divide(centroid_vector, centroid_vector.max())
+        for i in range(centroid_vector.shape[0]):
+            if centroid_vector[i] <= self.topic_threshold:
+                centroid_vector[i] = 0
+        return tfidf, centroid_vector
 
     def get_topic_idf(self, sentences):
         vectorizer = CountVectorizer()
@@ -116,12 +174,27 @@ class CentroidW2VSummarizer(base.BaseSummarizer):
         self.word_vectors_cache(clean_sentences)
         centroid_vector = self.compose_vectors(centroid_words)
 
+        tfidf, centroid_bow = self.get_bow(clean_sentences)
+        max_length = get_max_length(clean_sentences)
+
         sentences_scores = []
         for i in range(len(clean_sentences)):
+            scores = []
             words = clean_sentences[i].split()
             sentence_vector = self.compose_vectors(words)
-            score = base.similarity(sentence_vector, centroid_vector)
+
+            scores.append(base.similarity(sentence_vector, centroid_vector))
+            scores.append(self.bow_param * base.similarity(tfidf[i, :], centroid_bow))
+            scores.append(self.length_param * (1 - (len(words) / max_length)))
+            scores.append(self.position_param * (1 / (i + 1)))
+
+            score = average_score(scores)
+            # score = stanford_cerainty_factor(scores)
+
             sentences_scores.append((i, raw_sentences[i], score, sentence_vector))
+
+            if self.debug:
+                print(i, scores, score)
 
         sentence_scores_sort = sorted(sentences_scores, key=lambda el: el[2], reverse=True)
         if self.debug:
@@ -140,6 +213,8 @@ class CentroidW2VSummarizer(base.BaseSummarizer):
                         count += len(s[1].split())
                     else:
                         count += len(s[1])
+                    sentence_scores_sort.remove(s)
+                    break
 
         for s in sentence_scores_sort:
             if count > limit:

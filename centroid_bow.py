@@ -11,11 +11,13 @@ class CentroidBOWSummarizer(base.BaseSummarizer):
 
     def __init__(self,
                  language='english',
+                 preprocess_type='nltk',
                  stopwords_remove=True,
+                 length_limit=10,
                  debug=False,
                  topic_threshold=0.3,
                  sim_threshold=0.95):
-        super().__init__(language, stopwords_remove, debug)
+        super().__init__(language, preprocess_type, stopwords_remove, length_limit, debug)
         self.topic_threshold = topic_threshold
         self.sim_threshold = sim_threshold
         return
