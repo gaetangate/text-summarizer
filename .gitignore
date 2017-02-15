@@ -87,3 +87,8 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+# CUSTOM
+.idea/
+test/
+dataset/

@@ -64,7 +64,7 @@ class CentroidW2VSummarizer(base.BaseSummarizer):
                  position_param=0):
         super().__init__(language, preprocess_type, stopwords_remove, length_limit, debug)
 
-        self.word2vec = Word2Vec.load_word2vec_format(word2vec_model_path, binary=True)
+        self.word2vec = Word2Vec.load_word2vec_format(word2vec_model_path, binary=True, unicode_errors='ignore')
         self.index2word_set = set(self.word2vec.wv.index2word)
         self.word_vectors = dict()
 
