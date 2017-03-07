@@ -1,2 +1,2 @@
-# text-summarizer
-Python Framework for Extractive Text Summarization  
+# Text Summarizer
+Implementation based on paper "Centroid-based Text Summarization through Compositionality of Word Embeddings" accepted at  MultiLing Workshop in EACL 2017
