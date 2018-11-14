@@ -1,0 +1,6 @@
+setuptools
+gensim
+sklearn
+numpy
+nltk
+unidecode
