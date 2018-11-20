@@ -4,3 +4,4 @@ sklearn
 numpy
 nltk
 unidecode
+flashtext

@@ -6,9 +6,12 @@ import re
 import string
 import unidecode
 import numpy as np
-from nltk.tokenize import sent_tokenize, word_tokenize
+from nltk.tokenize import sent_tokenize as nltk_sent_tokenize
+from nltk.tokenize import word_tokenize as nltk_word_tokenize
 from nltk.corpus import stopwords
 from scipy.spatial.distance import cosine
+from gensim.summarization.textcleaner import split_sentences as gensim_sent_tokenize
+import flashtext
 
 
 def similarity(v1, v2):
@@ -33,10 +36,18 @@ class BaseSummarizer:
         self.stopwords_remove = stopwords_remove
         self.length_limit = length_limit
         self.debug = debug
+        if stopwords_remove:
+            stopword_remover = flashtext.KeywordProcessor()
+            for stopword in stopwords.words(self.language):
+                stopword_remover.add_keyword(stopword, '')
+            self.stopword_remover = stopword_remover
         return
 
     def sent_tokenize(self, text):
-        sents = sent_tokenize(text, self.language)
+        if self.preprocess_type == 'nltk':
+            sents = nltk_sent_tokenize(text, self.language)
+        else:
+            sents = gensim_sent_tokenize(text)
         sents_filtered = []
         for s in sents:
             if s[-1] != ':' and len(s) > self.length_limit:
@@ -49,13 +60,12 @@ class BaseSummarizer:
         sentences = self.sent_tokenize(text)
         sentences_cleaned = []
         for sent in sentences:
-            words = word_tokenize(sent, self.language)
+            if self.stopwords_remove:
+                self.stopword_remover.replace_keywords(sent)
+            words = nltk_word_tokenize(sent, self.language)
             words = [w for w in words if w not in string.punctuation]
             words = [w for w in words if w not in self.extra_stopwords]
             words = [w.lower() for w in words]
-            if self.stopwords_remove:
-                stops = set(stopwords.words(self.language))
-                words = [w for w in words if w not in stops]
             sentences_cleaned.append(" ".join(words))
         return sentences_cleaned
 
@@ -65,10 +75,9 @@ class BaseSummarizer:
         for sent in sentences:
             sent_ascii = unidecode.unidecode(sent)
             cleaned_text = re.sub("[^a-zA-Z0-9]", " ", sent_ascii)
-            words = cleaned_text.lower().split()
             if self.stopwords_remove:
-                stops = set(stopwords.words(self.language))
-                words = [w for w in words if w not in stops]
+                cleaned_text = self.stopword_remover.replace_keywords(cleaned_text)
+            words = cleaned_text.lower().split()
             sentences_cleaned.append(" ".join(words))
         return sentences_cleaned
 
