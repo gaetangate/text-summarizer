@@ -6,10 +6,11 @@ Centroid-based Text Summarization through Compositionality of Word Embeddings
 Author: Gaetano Rossiello
 Email: gaetano.rossiello@uniba.it
 """
-import base
+from text_summarizer import base
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
-from gensim.models.word2vec import Word2Vec
+from gensim.models import KeyedVectors
+import gensim.downloader as gensim_data_downloader
 
 
 def average_score(scores):
@@ -46,7 +47,14 @@ def get_max_length(sentences):
     return max_length
 
 
-class CentroidW2VSummarizer(base.BaseSummarizer):
+def loaded_embedding_model_path(model_name):
+    available_models = gensim_data_downloader.info()['models'].keys()
+    assert model_name in available_models, 'Invalid model_name: {}. Choose one from {}'.format(model_name, ', '.join(available_models))
+    model_path = gensim_data_downloader.load(model_name, return_path=True)
+    return model_path
+
+
+class CentroidWordEmbeddingsSummarizer(base.BaseSummarizer):
     def __init__(self,
                  word2vec_model_path,
                  language='english',
@@ -64,7 +72,7 @@ class CentroidW2VSummarizer(base.BaseSummarizer):
                  position_param=0):
         super().__init__(language, preprocess_type, stopwords_remove, length_limit, debug)
 
-        self.word2vec = Word2Vec.load_word2vec_format(word2vec_model_path, binary=True, unicode_errors='ignore')
+        self.word2vec = KeyedVectors.load_word2vec_format(word2vec_model_path, binary=True, unicode_errors='ignore')
         self.index2word_set = set(self.word2vec.wv.index2word)
         self.word_vectors = dict()
 
