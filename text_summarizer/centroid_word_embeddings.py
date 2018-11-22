@@ -47,16 +47,16 @@ def get_max_length(sentences):
     return max_length
 
 
-def loaded_embedding_model_path(model_name):
+def load_gensim_embedding_model(model_name):
     available_models = gensim_data_downloader.info()['models'].keys()
     assert model_name in available_models, 'Invalid model_name: {}. Choose one from {}'.format(model_name, ', '.join(available_models))
     model_path = gensim_data_downloader.load(model_name, return_path=True)
-    return model_path
+    return KeyedVectors.load_word2vec_format(model_path, binary=True, unicode_errors='ignore')
 
 
 class CentroidWordEmbeddingsSummarizer(base.BaseSummarizer):
     def __init__(self,
-                 word2vec_model_path,
+                 embedding_model,
                  language='english',
                  preprocess_type='nltk',
                  stopwords_remove=True,
@@ -65,15 +65,15 @@ class CentroidWordEmbeddingsSummarizer(base.BaseSummarizer):
                  topic_threshold=0.3,
                  sim_threshold=0.95,
                  reordering=True,
-                 subtract_centroid=False,
+                 zero_center_embeddings=False,
                  keep_first=False,
                  bow_param=0,
                  length_param=0,
                  position_param=0):
         super().__init__(language, preprocess_type, stopwords_remove, length_limit, debug)
 
-        self.word2vec = KeyedVectors.load_word2vec_format(word2vec_model_path, binary=True, unicode_errors='ignore')
-        self.index2word_set = set(self.word2vec.wv.index2word)
+        self.embedding_model = embedding_model
+
         self.word_vectors = dict()
 
         self.topic_threshold = topic_threshold
@@ -85,16 +85,10 @@ class CentroidWordEmbeddingsSummarizer(base.BaseSummarizer):
         self.length_param = length_param
         self.position_param = position_param
 
-        self.subtract_centroid = subtract_centroid
+        self.zero_center_embeddings = zero_center_embeddings
 
-        # Create the centroid vector of the whole vector space
-        count = 0
-        self.centroid_space = np.zeros(self.word2vec.vector_size, dtype="float32")
-        for w in self.index2word_set:
-            self.centroid_space = self.centroid_space + self.word2vec[w]
-            count += 1
-        if count != 0:
-            self.centroid_space = np.divide(self.centroid_space, count)
+        if zero_center_embeddings:
+            self._zero_center_embedding_coordinates()
         return
 
     def get_bow(self, sentences):
@@ -125,12 +119,10 @@ class CentroidWordEmbeddingsSummarizer(base.BaseSummarizer):
         # print(centroid_vector.max())
 
         feature_names = vectorizer.get_feature_names()
-        word_list = []
-        for i in range(centroid_vector.shape[0]):
-            if centroid_vector[i] > self.topic_threshold:
-                # print(feature_names[i], centroid_vector[i])
-                word_list.append(feature_names[i])
 
+        relevant_vector_indices = np.where(centroid_vector > self.topic_threshold)[0]
+
+        word_list = list(np.array(feature_names)[relevant_vector_indices])
         return word_list
 
     def word_vectors_cache(self, sentences):
@@ -138,16 +130,16 @@ class CentroidWordEmbeddingsSummarizer(base.BaseSummarizer):
         for s in sentences:
             words = s.split()
             for w in words:
-                if w in self.index2word_set:
-                    if self.subtract_centroid:
-                        self.word_vectors[w] = (self.word2vec[w] - self.centroid_space)
+                if self.word_vectors.get(w) is not None:
+                    if self.zero_center_embeddings:
+                        self.word_vectors[w] = (self.embedding_model[w] - self.centroid_space)
                     else:
-                        self.word_vectors[w] = self.word2vec[w]
+                        self.word_vectors[w] = self.embedding_model[w]
         return
 
     # Sentence representation with sum of word vectors
     def compose_vectors(self, words):
-        composed_vector = np.zeros(self.word2vec.vector_size, dtype="float32")
+        composed_vector = np.zeros(self.embedding_model.vector_size, dtype="float32")
         word_vectors_keys = set(self.word_vectors.keys())
         count = 0
         for w in words:
@@ -255,3 +247,14 @@ class CentroidWordEmbeddingsSummarizer(base.BaseSummarizer):
             print(summary)
 
         return summary
+
+    def _zero_center_embedding_coordinates(self):
+        # Create the centroid vector of the whole vector space
+        count = 0
+        self.centroid_space = np.zeros(self.embedding_model.vector_size, dtype="float32")
+        self.index2word_set = set(self.embedding_model.wv.index2word)
+        for w in self.index2word_set:
+            self.centroid_space = self.centroid_space + self.embedding_model[w]
+            count += 1
+        if count != 0:
+            self.centroid_space = np.divide(self.centroid_space, count)
