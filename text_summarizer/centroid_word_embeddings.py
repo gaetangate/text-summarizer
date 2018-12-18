@@ -74,8 +74,6 @@ class CentroidWordEmbeddingsSummarizer(base.BaseSummarizer):
 
         self.embedding_model = embedding_model
 
-        self.word_vectors = dict()
-
         self.topic_threshold = topic_threshold
         self.sim_threshold = sim_threshold
         self.reordering = reordering
@@ -125,26 +123,15 @@ class CentroidWordEmbeddingsSummarizer(base.BaseSummarizer):
         word_list = list(np.array(feature_names)[relevant_vector_indices])
         return word_list
 
-    def word_vectors_cache(self, sentences):
-        self.word_vectors = dict()
-        for s in sentences:
-            words = s.split()
-            for w in words:
-                if self.word_vectors.get(w) is not None:
-                    if self.zero_center_embeddings:
-                        self.word_vectors[w] = (self.embedding_model[w] - self.centroid_space)
-                    else:
-                        self.word_vectors[w] = self.embedding_model[w]
-        return
 
     # Sentence representation with sum of word vectors
+    # By default we'll use
     def compose_vectors(self, words):
         composed_vector = np.zeros(self.embedding_model.vector_size, dtype="float32")
-        word_vectors_keys = set(self.word_vectors.keys())
         count = 0
         for w in words:
-            if w in word_vectors_keys:
-                composed_vector = composed_vector + self.word_vectors[w]
+            if self.embedding_model.vocab.get(w) is not None:
+                composed_vector = composed_vector + self.embedding_model[w]
                 count += 1
         if count != 0:
             composed_vector = np.divide(composed_vector, count)
@@ -171,7 +158,6 @@ class CentroidWordEmbeddingsSummarizer(base.BaseSummarizer):
             print("*** CENTROID WORDS ***")
             print(len(centroid_words), centroid_words)
 
-        self.word_vectors_cache(clean_sentences)
         centroid_vector = self.compose_vectors(centroid_words)
 
         tfidf, centroid_bow = self.get_bow(clean_sentences)
