@@ -1,10 +1,9 @@
 """
-Implementation based on paper:
-
-Centroid-based Text Summarization through Compositionality of Word Embeddings
+Source code for the paper "Centroid-based Text Summarization through Compositionality of Word Embeddings"
+https://aclanthology.org/W17-1003/
 
 Author: Gaetano Rossiello
-Email: gaetano.rossiello@uniba.it
+Email: gaetano.rossiello@ibm.com
 """
 from text_summarizer import base
 import numpy as np
