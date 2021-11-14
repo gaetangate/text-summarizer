@@ -33,7 +33,7 @@ def stanford_cerainty_factor(scores):
         score += s
         if s < minim & s > 0:
             minim = s
-    score /= (1 - minim)
+    score /= 1 - minim
     return score
 
 
@@ -47,29 +47,38 @@ def get_max_length(sentences):
 
 
 def load_gensim_embedding_model(model_name):
-    available_models = gensim_data_downloader.info()['models'].keys()
-    assert model_name in available_models, 'Invalid model_name: {}. Choose one from {}'.format(model_name, ', '.join(available_models))
-    model_path = gensim_data_downloader.load(model_name, return_path=True)
-    return KeyedVectors.load_word2vec_format(model_path, binary=True, unicode_errors='ignore')
+    available_models = gensim_data_downloader.info()["models"].keys()
+    assert (
+        model_name in available_models
+    ), "Invalid model_name: {}. Choose one from {}".format(
+        model_name, ", ".join(available_models)
+    )
+
+    return gensim_data_downloader.load(model_name)
 
 
 class CentroidWordEmbeddingsSummarizer(base.BaseSummarizer):
-    def __init__(self,
-                 embedding_model,
-                 language='english',
-                 preprocess_type='nltk',
-                 stopwords_remove=True,
-                 length_limit=10,
-                 debug=False,
-                 topic_threshold=0.3,
-                 sim_threshold=0.95,
-                 reordering=True,
-                 zero_center_embeddings=False,
-                 keep_first=False,
-                 bow_param=0,
-                 length_param=0,
-                 position_param=0):
-        super().__init__(language, preprocess_type, stopwords_remove, length_limit, debug)
+    def __init__(
+        self,
+        embedding_model,
+        language="english",
+        preprocess_type="nltk",
+        stopwords_remove=True,
+        length_limit=10,
+        debug=False,
+        topic_threshold=0.3,
+        sim_threshold=0.95,
+        reordering=True,
+        zero_center_embeddings=False,
+        keep_first=False,
+        bow_param=0,
+        length_param=0,
+        position_param=0,
+    ):
+        print("initialisation!!!\n\n\n")
+        super().__init__(
+            language, preprocess_type, stopwords_remove, length_limit, debug
+        )
 
         self.embedding_model = embedding_model
 
@@ -129,9 +138,14 @@ class CentroidWordEmbeddingsSummarizer(base.BaseSummarizer):
         for s in sentences:
             words = s.split()
             for w in words:
-                if self.word_vectors.get(w) is not None:
+                # import ipdb
+
+                # ipdb.set_trace()
+                if w in self.embedding_model.vocab.keys():
                     if self.zero_center_embeddings:
-                        self.word_vectors[w] = (self.embedding_model[w] - self.centroid_space)
+                        self.word_vectors[w] = (
+                            self.embedding_model[w] - self.centroid_space
+                        )
                     else:
                         self.word_vectors[w] = self.embedding_model[w]
         return
@@ -149,14 +163,16 @@ class CentroidWordEmbeddingsSummarizer(base.BaseSummarizer):
             composed_vector = np.divide(composed_vector, count)
         return composed_vector
 
-    def summarize(self, text, limit_type='word', limit=100):
+    def summarize(self, text, limit_type="word", limit=100):
         raw_sentences = self.sent_tokenize(text)
         clean_sentences = self.preprocess_text(text)
 
         if self.debug:
-            print("ORIGINAL TEXT STATS = {0} chars, {1} words, {2} sentences".format(len(text),
-                                                                                     len(text.split(' ')),
-                                                                                     len(raw_sentences)))
+            print(
+                "ORIGINAL TEXT STATS = {0} chars, {1} words, {2} sentences".format(
+                    len(text), len(text.split(" ")), len(raw_sentences)
+                )
+            )
             print("*** RAW SENTENCES ***")
             for i, s in enumerate(raw_sentences):
                 print(i, s)
@@ -186,7 +202,6 @@ class CentroidWordEmbeddingsSummarizer(base.BaseSummarizer):
             scores.append(self.bow_param * base.similarity(tfidf[i, :], centroid_bow))
             scores.append(self.length_param * (1 - (len(words) / max_length)))
             scores.append(self.position_param * (1 / (i + 1)))
-
             score = average_score(scores)
             # score = stanford_cerainty_factor(scores)
 
@@ -195,7 +210,9 @@ class CentroidWordEmbeddingsSummarizer(base.BaseSummarizer):
             if self.debug:
                 print(i, scores, score)
 
-        sentence_scores_sort = sorted(sentences_scores, key=lambda el: el[2], reverse=True)
+        sentence_scores_sort = sorted(
+            sentences_scores, key=lambda el: el[2], reverse=True
+        )
         if self.debug:
             print("*** SENTENCE SCORES ***")
             for s in sentence_scores_sort:
@@ -208,7 +225,7 @@ class CentroidWordEmbeddingsSummarizer(base.BaseSummarizer):
             for s in sentence_scores_sort:
                 if s[0] == 0:
                     sentences_summary.append(s)
-                    if limit_type == 'word':
+                    if limit_type == "word":
                         count += len(s[1].split())
                     else:
                         count += len(s[1])
@@ -227,20 +244,24 @@ class CentroidWordEmbeddingsSummarizer(base.BaseSummarizer):
             if include_flag:
                 # print(s[0], s[1])
                 sentences_summary.append(s)
-                if limit_type == 'word':
+                if limit_type == "word":
                     count += len(s[1].split())
                 else:
                     count += len(s[1])
 
         if self.reordering:
-            sentences_summary = sorted(sentences_summary, key=lambda el: el[0], reverse=False)
+            sentences_summary = sorted(
+                sentences_summary, key=lambda el: el[0], reverse=False
+            )
 
         summary = "\n".join([s[1] for s in sentences_summary])
 
         if self.debug:
-            print("SUMMARY TEXT STATS = {0} chars, {1} words, {2} sentences".format(len(summary),
-                                                                                    len(summary.split(' ')),
-                                                                                    len(sentences_summary)))
+            print(
+                "SUMMARY TEXT STATS = {0} chars, {1} words, {2} sentences".format(
+                    len(summary), len(summary.split(" ")), len(sentences_summary)
+                )
+            )
 
             print("*** SUMMARY ***")
             print(summary)
@@ -250,7 +271,9 @@ class CentroidWordEmbeddingsSummarizer(base.BaseSummarizer):
     def _zero_center_embedding_coordinates(self):
         # Create the centroid vector of the whole vector space
         count = 0
-        self.centroid_space = np.zeros(self.embedding_model.vector_size, dtype="float32")
+        self.centroid_space = np.zeros(
+            self.embedding_model.vector_size, dtype="float32"
+        )
         self.index2word_set = set(self.embedding_model.wv.index2word)
         for w in self.index2word_set:
             self.centroid_space = self.centroid_space + self.embedding_model[w]

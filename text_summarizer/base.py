@@ -28,12 +28,14 @@ class BaseSummarizer:
 
     extra_stopwords = ["''", "``", "'s"]
 
-    def __init__(self,
-                 language='english',
-                 preprocess_type='nltk',
-                 stopwords_remove=True,
-                 length_limit=10,
-                 debug=False):
+    def __init__(
+        self,
+        language="english",
+        preprocess_type="nltk",
+        stopwords_remove=True,
+        length_limit=10,
+        debug=False,
+    ):
         self.language = language
         self.preprocess_type = preprocess_type
         self.stopwords_remove = stopwords_remove
@@ -42,18 +44,18 @@ class BaseSummarizer:
         if stopwords_remove:
             stopword_remover = flashtext.KeywordProcessor()
             for stopword in stopwords.words(self.language):
-                stopword_remover.add_keyword(stopword, '')
+                stopword_remover.add_keyword(stopword, "###nul###")
             self.stopword_remover = stopword_remover
         return
 
     def sent_tokenize(self, text):
-        if self.preprocess_type == 'nltk':
+        if self.preprocess_type == "nltk":
             sents = nltk_sent_tokenize(text, self.language)
         else:
             sents = gensim_sent_tokenize(text)
         sents_filtered = []
         for s in sents:
-            if s[-1] != ':' and len(s) > self.length_limit:
+            if s[-1] != ":" and len(s) > self.length_limit:
                 sents_filtered.append(s)
             # else:
             #   print("REMOVED!!!!" + s)
@@ -64,7 +66,9 @@ class BaseSummarizer:
         sentences_cleaned = []
         for sent in sentences:
             if self.stopwords_remove:
-                self.stopword_remover.replace_keywords(sent)
+                sent = self.stopword_remover.replace_keywords(sent).replace(
+                    "###nul###", ""
+                )
             words = nltk_word_tokenize(sent, self.language)
             words = [w for w in words if w not in string.punctuation]
             words = [w for w in words if w not in self.extra_stopwords]
@@ -85,10 +89,10 @@ class BaseSummarizer:
         return sentences_cleaned
 
     def preprocess_text(self, text):
-        if self.preprocess_type == 'nltk':
+        if self.preprocess_type == "nltk":
             return self.preprocess_text_nltk(text)
         else:
             return self.preprocess_text_regexp(text)
 
-    def summarize(self, text, limit_type='word', limit=100):
+    def summarize(self, text, limit_type="word", limit=100):
         raise NotImplementedError("Abstract method")
